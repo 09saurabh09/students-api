@@ -5,6 +5,7 @@ module.exports = {
         answer.concepts = question.concepts;
         answer.options = question.options;
         answer.chapter =  question.chapter;
+        answer.difficulty = question.difficulty;
         answer.subject =  _.get(question, `chapter.subject`);
         answer.user = user;
         return answer.save();

@@ -2,7 +2,7 @@ const answerService = require('./answerService');
 const questionService = require('../question/questionService');
 
 module.exports = {
-    async createAnswer(ctx, next) {
+    async createAnswer(ctx) {
         let response = new RESPONSE_MESSAGE.GenericSuccessMessage();
         const params = ctx.request.body;
         const question = await questionService.getQuestionObject(_.get(params, `answer.questionId`));

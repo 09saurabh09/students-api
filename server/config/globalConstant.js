@@ -28,6 +28,8 @@ global.RESPONSE_MESSAGE = responseMessage;
 global.LOGGER = (text) => {
 	console.log(text + " timestamp - " + moment().format());
 };
+global.DIFFICULTY_LEVEL_ENUM = [1, 2, 3, 4];
+global.ANSWER_STATUS_ENUM = ["correct", "partialCorrect", "incorrect"];
 MONGOOSE.Promise = PROMISE;
 
 // API servers
@@ -36,3 +38,5 @@ global.QUSETION_SERVER = env.QUSETION_SERVER
 global.GlobalConstant = {};
 GlobalConstant.tokenSecret = env.TOKEN_SECRET;
 GlobalConstant.tokenValidity = env.TOKEN_VALIDITY;
+GlobalConstant.questionDiversityLimit = 10;
+GlobalConstant.sumOfDifficulty= DIFFICULTY_LEVEL_ENUM.reduce((a, b) => a + b, 0);

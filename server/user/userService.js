@@ -27,27 +27,30 @@ module.exports = {
         _.each(answer.concepts, concept => {
             let update = {
                 "$inc": {
-                    [`difficultyDiscribution.${answer.difficulty}`]: 1
+                    [`difficultyDiscribution.${answer.difficulty}`]: 1,
+                    "weightAttempted": concept.weight
                 }
             }
-            userConceptPromise.push(UserConceptModel.findOneAndUpdate({questionId: answer.questionId, conceptId: concept.id}, update, options))
+            if (answer.status == "correct") _.set(update, `$inc.weightCorrect`, concept.weight);
+            userConceptPromise.push(UserConceptModel.findOneAndUpdate({user: answer.user, conceptId: concept.id}, update, options))
         })
         return PROMISE.all(userConceptPromise);
     },
 
     async createUserConceptHistory(userConcept) {
-        let options = {
-            new: true,
-            upsert: true
-        };
+        let tempCoefficient = 0;
+        _.each(DIFFICULTY_LEVEL_ENUM, difficulty => {
+            tempCoefficient += difficulty * Math.min(GlobalConstant.questionDiversityLimit, _.get(userConcept, `difficultyDiscribution.${difficulty}`) || 0);
+        })
 
-        let update = {
-            "$set": {
-                attemptedDiversity: 1,
-                correctness: 1,
-                score: 1
-            }
-        }
-        return UserConceptHistoryModel.findOneAndUpdate({questionId: userConcept.questionId, conceptId: userConcept.conceptId}, update, options)
+        let attemptedDiversity = (1 / (GlobalConstant.questionDiversityLimit * GlobalConstant.sumOfDifficulty)) * tempCoefficient;
+        let correctness = userConcept.weightCorrect / userConcept.weightAttempted;
+        return new UserConceptHistoryModel({
+            user: userConcept.user,
+            conceptId: userConcept.conceptId,
+            attemptedDiversity,
+            correctness,
+            score: attemptedDiversity * correctness
+        }).save();
     }
 }

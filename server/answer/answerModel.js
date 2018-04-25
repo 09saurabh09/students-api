@@ -1,8 +1,14 @@
 const answerSchema = new MONGOOSE.Schema({
     questionId:  String,
     optionsSelected: [String],
-    status: String,
-    difficulty: Number,
+    status: {
+        type: String,
+        enum: ANSWER_STATUS_ENUM
+    },
+    difficulty: {
+        type: String,
+        enum: DIFFICULTY_LEVEL_ENUM
+    },
     concepts: [],
     options: [],
     chapter: String,
@@ -22,7 +28,7 @@ answerSchema.post('save', function() {
     const userService = require('../user/userService');
     if (this.wasNew) {
         userService.createUserConcept(self).then(userConcepts => {
-            return PROMISE.all(userConcepts.map(userConcept => userService.createUserConceptHistory(userConcept)))
+            return PROMISE.all(userConcepts.map(userConcept => userService.createUserConceptHistory(userConcept)));
         }).catch(err => {
             LOGGER(`Unable to create user concept history, error: ${err.message} stack: ${err.stack}`);  
         })

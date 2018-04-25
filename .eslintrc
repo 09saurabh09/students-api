@@ -43,6 +43,8 @@
       "APP_ERROR": false,
       "RESPONSE_HELPER": false,
       "RESPONSE_MESSAGE": false,
-      "QUSETION_SERVER": false
+      "QUSETION_SERVER": false,
+      "DIFFICULTY_LEVEL_ENUM": false,
+      "ANSWER_STATUS_ENUM": false
     }
   }

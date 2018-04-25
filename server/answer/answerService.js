@@ -8,6 +8,9 @@ module.exports = {
         answer.difficulty = question.difficulty;
         answer.subject =  _.get(question, `chapter.subject`);
         answer.user = user;
+        const correctOptions = question.options.filter(option => option.isCorrect).map(option => option._id);
+        if (_.isEqual(correctOptions.sort(), answer.optionsSelected.sort())) answer.status = "correct";
+        else answer.status = "incorrect";
         return answer.save();
     }
 }

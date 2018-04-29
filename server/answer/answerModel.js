@@ -23,15 +23,23 @@ answerSchema.pre('save', function(next) {
     next();
 });
 
-answerSchema.post('save', function() {
+answerSchema.post('save', async function() {
     const self = this;
     const userService = require('../user/userService');
     if (this.wasNew) {
-        userService.createUserConcept(self).then(userConcepts => {
-            return PROMISE.all(userConcepts.map(userConcept => userService.createUserConceptHistory(userConcept)));
-        }).catch(err => {
+        try {
+            let userConcepts = await userService.createUserConcept(self);
+            await PROMISE.all(userConcepts.map(userConcept => userService.createUserConceptHistory(userConcept)));
+            await userService.createUserChapterHistory(userConcepts);
+        } catch(err) {
             LOGGER(`Unable to create user concept history, error: ${err.message} stack: ${err.stack}`);  
-        })
+        }
+
+        // userService.createUserConcept(self).then(userConcepts => {
+        //     return PROMISE.all(userConcepts.map(userConcept => userService.createUserConceptHistory(userConcept))).then(userService.createUserChapterHistory);
+        // }).catch(err => {
+        //     LOGGER(`Unable to create user concept history, error: ${err.message} stack: ${err.stack}`);  
+        // })
     }
 });
 

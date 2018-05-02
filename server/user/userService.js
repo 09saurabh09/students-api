@@ -2,6 +2,8 @@ const UserModel = MONGOOSE.model('User');
 const jwt = require("jsonwebtoken");
 const UserConceptModel = MONGOOSE.model('UserConcept')
 const UserConceptHistoryModel = MONGOOSE.model('UserConceptHistory')
+const UserChapterModel = MONGOOSE.model('UserChapter')
+const UserChapterHistoryModel = MONGOOSE.model('UserChapterHistory');
 const questionService = require('../question/questionService');
 const helperFunction = require('../utils/helperFunction');
 
@@ -53,10 +55,11 @@ module.exports = {
         }).save();
     },
 
-    async createUserChapterHistory(userConcepts) {
+    async createUserChapter(userConcepts) {
         let chapterToConceptMapping = {};
         let conceptToUcMapping = {};
         let chapterDiff = {};
+        let userChapterPromise = [];
         let conceptIds = _.map(userConcepts, uc => uc.conceptId);
         let conceptList = await questionService.getConceptListObject(conceptIds);
 
@@ -75,5 +78,30 @@ module.exports = {
             });
             chapterDiff[chapter] = _.sum(newScores) - _.sum(oldScores);
         });
+
+        let chapterWiseConceptCount = await questionService.getChapterWiseConceptCount(Object.keys(chapterDiff));
+
+        let options = {
+            new: true,
+            upsert: true
+        };
+        _.each(chapterDiff, (currentChapterDiff, chapterId) => {
+            let update = {
+                "$inc": {
+                    "score": currentChapterDiff / chapterWiseConceptCount[chapterId]
+                }
+            }
+            userChapterPromise.push(UserChapterModel.findOneAndUpdate({user: userConcepts[0].user, chapterId: chapterId}, update, options).lean())
+        });
+
+        return PROMISE.all(userChapterPromise);
+    },
+
+    async createUserChapterHistoru(userChapter) {
+        return new UserChapterHistoryModel({
+            user: userChapter.user,
+            chapterId: userChapter.chapterId,
+            score: userChapter.score
+        }).save();
     }
 }

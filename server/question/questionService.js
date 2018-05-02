@@ -38,4 +38,20 @@ module.exports = {
 		if(statusCode !== 200) throw new Error(`Unbale to fetch concept list`);
 		return _.get(body, `data`);
     },
+
+    async getChapterWiseConceptCount(chapterIdList) {
+        let url = `${QUSETION_SERVER}/internal/api/concepts/chapter-wise-count`;
+        let options = {
+            url,
+            method: 'GET',
+            json: true,
+            qs: {
+                chapterId: chapterIdList
+            },
+            useQuerystring: true
+        };
+		const {body, statusCode} = await requestHelper(options);
+		if(statusCode !== 200) throw new Error(`Unbale to fetch concept list`);
+		return _.get(body, `data`);
+    }
 }

@@ -2,6 +2,10 @@ const UserModel = MONGOOSE.model('User');
 const jwt = require("jsonwebtoken");
 const UserConceptModel = MONGOOSE.model('UserConcept')
 const UserConceptHistoryModel = MONGOOSE.model('UserConceptHistory')
+const UserChapterModel = MONGOOSE.model('UserChapter')
+const UserChapterHistoryModel = MONGOOSE.model('UserChapterHistory');
+const questionService = require('../question/questionService');
+const helperFunction = require('../utils/helperFunction');
 
 module.exports = {
     async createUser(params) {
@@ -27,30 +31,77 @@ module.exports = {
         _.each(answer.concepts, concept => {
             let update = {
                 "$inc": {
-                    [`difficultyDiscribution.${answer.difficulty}`]: 1,
+                    [`difficultyDistribution.${answer.difficulty}`]: 1,
                     "weightAttempted": concept.weight
                 }
             }
             if (answer.status == "correct") _.set(update, `$inc.weightCorrect`, concept.weight);
-            userConceptPromise.push(UserConceptModel.findOneAndUpdate({user: answer.user, conceptId: concept.id}, update, options))
-        })
+            _.each(_.get(update, `$inc`), (change, key) => {
+                _.setWith(update, `changes.${key}`, change, Object);
+            });
+            userConceptPromise.push(UserConceptModel.findOneAndUpdate({user: answer.user, conceptId: concept.id}, update, options).lean())
+        });
         return PROMISE.all(userConceptPromise);
     },
 
     async createUserConceptHistory(userConcept) {
-        let tempCoefficient = 0;
-        _.each(DIFFICULTY_LEVEL_ENUM, difficulty => {
-            tempCoefficient += difficulty * Math.min(GlobalConstant.questionDiversityLimit, _.get(userConcept, `difficultyDiscribution.${difficulty}`) || 0);
-        })
-
-        let attemptedDiversity = (1 / (GlobalConstant.questionDiversityLimit * GlobalConstant.sumOfDifficulty)) * tempCoefficient;
-        let correctness = userConcept.weightCorrect / userConcept.weightAttempted;
+        let {attemptedDiversity, correctness} = helperFunction.getUserParams(userConcept);
         return new UserConceptHistoryModel({
             user: userConcept.user,
             conceptId: userConcept.conceptId,
             attemptedDiversity,
             correctness,
             score: attemptedDiversity * correctness
+        }).save();
+    },
+
+    async createUserChapter(userConcepts) {
+        let chapterToConceptMapping = {};
+        let conceptToUcMapping = {};
+        let chapterDiff = {};
+        let userChapterPromise = [];
+        let conceptIds = _.map(userConcepts, uc => uc.conceptId);
+        let conceptList = await questionService.getConceptListObject(conceptIds);
+
+        _.each(userConcepts, uch => conceptToUcMapping[uch.conceptId] = uch);
+        _.each(conceptList, concept => {
+            if (!chapterToConceptMapping[concept.chapter]) chapterToConceptMapping[concept.chapter] = [];
+            chapterToConceptMapping[concept.chapter].push(concept._id)
+        });
+        _.each(chapterToConceptMapping, (concepts, chapter) => {
+            let oldScores = [];
+            let newScores = [];
+            _.each(concepts, conceptId => {
+                const oldUcInstance = helperFunction.getOldObject(conceptToUcMapping[conceptId]);
+                oldScores.push(UserConceptModel.getScore(oldUcInstance))
+                newScores.push(UserConceptModel.getScore(conceptToUcMapping[conceptId]));
+            });
+            chapterDiff[chapter] = _.sum(newScores) - _.sum(oldScores);
+        });
+
+        let chapterWiseConceptCount = await questionService.getChapterWiseConceptCount(Object.keys(chapterDiff));
+
+        let options = {
+            new: true,
+            upsert: true
+        };
+        _.each(chapterDiff, (currentChapterDiff, chapterId) => {
+            let update = {
+                "$inc": {
+                    "score": currentChapterDiff / chapterWiseConceptCount[chapterId]
+                }
+            }
+            userChapterPromise.push(UserChapterModel.findOneAndUpdate({user: userConcepts[0].user, chapterId: chapterId}, update, options).lean())
+        });
+
+        return PROMISE.all(userChapterPromise);
+    },
+
+    async createUserChapterHistoru(userChapter) {
+        return new UserChapterHistoryModel({
+            user: userChapter.user,
+            chapterId: userChapter.chapterId,
+            score: userChapter.score
         }).save();
     }
 }

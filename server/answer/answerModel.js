@@ -31,8 +31,9 @@ answerSchema.post('save', async function() {
             let userConcepts = await userService.createUserConcept(self);
             await PROMISE.all(userConcepts.map(userConcept => userService.createUserConceptHistory(userConcept)));
             let userChapters = await userService.createUserChapter(userConcepts);
-            await PROMISE.all(userChapters.map(userChapter => userService.createUserChapterHistoru(userChapter)));
-            
+            await PROMISE.all(userChapters.map(userChapter => userService.createUserChapterHistory(userChapter)));
+            let userSubject = await userService.createUserSubject({answer: self, userChapters});
+            await userService.createUserSubjectHistory(userSubject);
         } catch(err) {
             LOGGER(`Unable to create user concept history, error: ${err.message} stack: ${err.stack}`);  
         }

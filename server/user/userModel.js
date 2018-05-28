@@ -2,7 +2,10 @@ const bcrypt = require('bcrypt');
 const userSchema = new MONGOOSE.Schema({
     name: String,
     email: String,
-    password: String
+    password: String,
+    organization: String,
+    standard: Number,
+    subjects: [{id: {type: String}}]
 }, {
         timestamps: true
     });

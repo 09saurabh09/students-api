@@ -53,5 +53,21 @@ module.exports = {
 		const {body, statusCode} = await requestHelper(options);
 		if(statusCode !== 200) throw new Error(`Unbale to fetch concept list`);
 		return _.get(body, `data`);
+    },
+
+    async getChapterCount(subject) {
+        let url = `${QUSETION_SERVER}/internal/api/chapters/chapter-count`;
+        let options = {
+            url,
+            method: 'GET',
+            json: true,
+            qs: {
+                subject
+            },
+            useQuerystring: true
+        };
+		const {body, statusCode} = await requestHelper(options);
+		if(statusCode !== 200) throw new Error(`Unbale to fetch concept list`);
+		return _.get(body, `data`);
     }
 }

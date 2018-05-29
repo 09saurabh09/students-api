@@ -163,10 +163,21 @@ module.exports = {
         }).save();
     },
 
-    async getPerformanceDistribution({params, user}) {
+    async getPerformanceDistribution({params, userIds}) {
         const {EntityHistoryModel} = userHelper.getEntityFromType(params.type);
 
         if (!EntityHistoryModel || !params.id) throw new APP_ERROR({message: `Type or id is not valid`});
-        return EntityHistoryModel.find({user, [`${params.type}Id`]: params.id}).exec();
+        const pipeline = [
+            {
+                $match: {user: {"$in": userIds}, [`${params.type}Id`]: params.id}
+            },
+            {
+              $group : {
+                 _id : { month: { $month: "$createdAt" }, day: { $dayOfMonth: "$createdAt" }, year: { $year: "$createdAt" } },
+                 score: { $sum: "$score" }
+              }
+            }
+         ]
+        return EntityHistoryModel.aggregate(pipeline).exec();
     }
 }

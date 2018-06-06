@@ -5,6 +5,7 @@ const userConceptSchema = new MONGOOSE.Schema({
     weightCorrect: Number,
     difficultyDistribution: {}, // will store number of questions answered by difficulty level for particular concept
     changes: {},
+    score: Number,
     user: { type: MONGOOSE.Schema.Types.ObjectId, ref: 'User' },
   }, {
       timestamps: true

@@ -10,6 +10,7 @@ const morgan = require('koa-morgan');
 const unless = require('koa-unless');
 require('dotenv').config({ path: `${__dirname}/config/environments/${process.env.NODE_ENV}.env` });
 require('./server/config/globalConstant');
+require("./server/config/prototype");
 
 mongoose.connect(MONGO_URL);
 mongoose.connection.on('connected', function () {

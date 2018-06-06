@@ -42,9 +42,14 @@ module.exports = {
             _.each(_.get(update, `$inc`), (change, key) => {
                 _.setWith(update, `changes.${key}`, change, Object);
             });
-            userConceptPromise.push(UserConceptModel.findOneAndUpdate({user: answer.user, conceptId: concept.id}, update, options).lean())
+            userConceptPromise.push(UserConceptModel.findOneAndUpdate({user: answer.user, conceptId: concept.id}, update, options))
         });
-        return PROMISE.all(userConceptPromise);
+        let userConcepts = await PROMISE.all(userConceptPromise);
+
+        // Update score in this model also, this approach can fail in race condition but eventually it will be corrected automatically
+        userConcepts.map(userConcept => userConcept.score = UserConceptModel.getScore(userConcept));
+
+        return PROMISE.all(userConcepts.map(userConcept => userConcept.save()));
     },
 
     async createUserConceptHistory(userConcept) {
@@ -174,10 +179,35 @@ module.exports = {
             {
               $group : {
                  _id : { month: { $month: "$createdAt" }, day: { $dayOfMonth: "$createdAt" }, year: { $year: "$createdAt" } },
-                 score: { $sum: "$score" }
+                 score: { $max: "$score" }
               }
             }
          ]
+         // Score will change, as in case of class avg should be taken
         return EntityHistoryModel.aggregate(pipeline).exec();
+    },
+
+    async getPerformanceScore({params, userIds}) {
+        const {EntityModel} = userHelper.getEntityFromType(params.type);
+        let groupBy;
+
+        if (!EntityModel  || !params.id) throw new APP_ERROR({message: `Type or id is not valid`});
+        if (params.queryType == "student") groupBy = `user`;
+        else if (params.queryType == "courseAttr") groupBy = `${params.type}Id`
+        else throw new APP_ERROR({message: `queryType is not valid`});
+
+        const pipeline = [
+            {
+                $match: {user: {"$in": userIds}, [`${params.type}Id`]: {$in: helperFunction.ensureArray(params.id)}}
+            },
+            {
+              $group : {
+                 _id : `$${groupBy}`,
+                 score: { $avg: "$score" }
+              }
+            }
+         ]
+         // Score will change, as in case of class avg should be taken
+        return EntityModel.aggregate(pipeline).exec();
     }
 }

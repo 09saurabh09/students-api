@@ -23,5 +23,9 @@ module.exports = {
                 break;        
         }
         return {EntityModel, EntityHistoryModel};
+    },
+
+    isQueryForClass(params) {
+        return params.standard && params.organization;
     }
 }

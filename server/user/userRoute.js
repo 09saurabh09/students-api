@@ -29,4 +29,10 @@ router.get('/my-performance', userController.getMyPerformanceDistribution)
 // API to be used by teachers to monitor performance
 internalRouter.get('/performance', userController.getPerformanceDistribution);
 
+// API to used by user for performance in concept, chapteror subject based on params
+router.get('/my-performance-score', userController.getMyPerformanceScore)
+
+// API to be used by teachers to monitor performance
+internalRouter.get('/performance-score', userController.getPerformanceScore);
+
 module.exports = {router, publicRouter, internalRouter};

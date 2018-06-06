@@ -21,5 +21,14 @@ module.exports = {
             attemptedDiversity,
             correctness
         }
+    },
+
+    ensureArray (instance) {
+        if (arguments.length === 0) return [];            
+        if (arguments.length === 1) {                     
+            if (instance === undefined || instance === null) return []; 
+            if (Array.isArray(instance)) return instance;               
+        }
+        return Array.prototype.slice.call(arguments);     
     }
 }

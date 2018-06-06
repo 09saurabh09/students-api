@@ -10,6 +10,7 @@ const morgan = require('koa-morgan');
 const unless = require('koa-unless');
 require('dotenv').config({ path: `${__dirname}/config/environments/${process.env.NODE_ENV}.env` });
 require('./server/config/globalConstant');
+require("./server/config/prototype");
 
 mongoose.connect(MONGO_URL);
 mongoose.connection.on('connected', function () {
@@ -50,7 +51,7 @@ app.use(morgan('dev'))
 
 // Add auth middleware with unless
 customMiddleware.authenticate.unless = unless
-app.use(customMiddleware.authenticate.unless({ path: [/^\/public/] }));
+app.use(customMiddleware.authenticate.unless({ path: [/^\/public/, /^\/internal/] }));
 
 // // support different functions for different pages on the server
 // app.use(router.routes())

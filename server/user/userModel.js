@@ -1,8 +1,27 @@
 const bcrypt = require('bcrypt');
 const userSchema = new MONGOOSE.Schema({
-    name: String,
-    email: String,
-    password: String
+    name: {
+        type: String,
+        required: [true, "User name is required"],
+    },
+    email: {
+        type: String,
+        required: [true, "User email is required"],
+    },
+    password: {
+        type: String,
+        required: [true, "User password is required"],
+    },
+    organization: {
+        type: String,
+        lowercase: true,
+        required: [true, "User organizarion is required"],
+    },
+    standard: {
+        type: String,
+        required: [true, "User standard is required"],
+    },
+    subjects: [{id: {type: String}}]
 }, {
         timestamps: true
     });

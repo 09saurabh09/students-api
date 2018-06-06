@@ -4,8 +4,11 @@ const UserConceptModel = MONGOOSE.model('UserConcept')
 const UserConceptHistoryModel = MONGOOSE.model('UserConceptHistory')
 const UserChapterModel = MONGOOSE.model('UserChapter')
 const UserChapterHistoryModel = MONGOOSE.model('UserChapterHistory');
+const UserSubjectModel = MONGOOSE.model('UserSubject')
+const UserSubjectHistoryModel = MONGOOSE.model('UserSubjectHistory');
 const questionService = require('../question/questionService');
 const helperFunction = require('../utils/helperFunction');
+const userHelper = require('./userHelper');
 
 module.exports = {
     async createUser(params) {
@@ -39,9 +42,14 @@ module.exports = {
             _.each(_.get(update, `$inc`), (change, key) => {
                 _.setWith(update, `changes.${key}`, change, Object);
             });
-            userConceptPromise.push(UserConceptModel.findOneAndUpdate({user: answer.user, conceptId: concept.id}, update, options).lean())
+            userConceptPromise.push(UserConceptModel.findOneAndUpdate({user: answer.user, conceptId: concept.id}, update, options))
         });
-        return PROMISE.all(userConceptPromise);
+        let userConcepts = await PROMISE.all(userConceptPromise);
+
+        // Update score in this model also, this approach can fail in race condition but eventually it will be corrected automatically
+        userConcepts.map(userConcept => userConcept.score = UserConceptModel.getScore(userConcept));
+
+        return PROMISE.all(userConcepts.map(userConcept => userConcept.save()));
     },
 
     async createUserConceptHistory(userConcept) {
@@ -61,6 +69,9 @@ module.exports = {
         let chapterDiff = {};
         let userChapterPromise = [];
         let conceptIds = _.map(userConcepts, uc => uc.conceptId);
+
+        // We are not picking chapter from answer instance because one concept can belong to multiple chapters
+        // So answering this question will impact performance in all chapters
         let conceptList = await questionService.getConceptListObject(conceptIds);
 
         _.each(userConcepts, uch => conceptToUcMapping[uch.conceptId] = uch);
@@ -76,6 +87,8 @@ module.exports = {
                 oldScores.push(UserConceptModel.getScore(oldUcInstance))
                 newScores.push(UserConceptModel.getScore(conceptToUcMapping[conceptId]));
             });
+
+            // This diff consist of change in proficiency level of these particular concepts
             chapterDiff[chapter] = _.sum(newScores) - _.sum(oldScores);
         });
 
@@ -91,17 +104,110 @@ module.exports = {
                     "score": currentChapterDiff / chapterWiseConceptCount[chapterId]
                 }
             }
+            _.each(_.get(update, `$inc`), (change, key) => {
+                _.setWith(update, `changes.${key}`, change, Object);
+            });
             userChapterPromise.push(UserChapterModel.findOneAndUpdate({user: userConcepts[0].user, chapterId: chapterId}, update, options).lean())
         });
 
         return PROMISE.all(userChapterPromise);
     },
 
-    async createUserChapterHistoru(userChapter) {
+    async createUserChapterHistory(userChapter) {
         return new UserChapterHistoryModel({
             user: userChapter.user,
             chapterId: userChapter.chapterId,
             score: userChapter.score
         }).save();
+    },
+
+    async updateUser(params, user) {
+        let update = {
+            $set: _.pick(params.user, ['name', 'email', 'organization', 'standard', 'subjects'])
+        }
+        return UserModel.findOneAndUpdate({_id: user._id}, update, {new: true});
+    },
+
+    async searchUser(params) {
+        let searchQuery = {};
+        if (params.name) searchQuery.name =  new RegExp(params.email, 'i');
+        if (params.email) searchQuery.email = params.email;
+        return UserModel.find(searchQuery).select({name: 1}).lean().exec();
+    },
+
+    async createUserSubject({answer, userChapters}) {
+        let subjectId = answer.subject;
+        let diff = 0;
+        _.each(userChapters, userChapter => {
+            const oldUserChapterInstance = helperFunction.getOldObject(userChapter);
+            diff += userChapter.score - (oldUserChapterInstance.score || 0);
+        })
+        
+        // TODO avoid history creation in case of 0 diff
+        const chapterCount = await questionService.getChapterCount(subjectId);
+        let update = {
+            "$inc": {
+                "score": diff / chapterCount[subjectId] // TODO put check for non zero denominator
+            }
+        }
+        let options = {
+            new: true,
+            upsert: true
+        };
+        _.each(_.get(update, `$inc`), (change, key) => {
+            _.setWith(update, `changes.${key}`, change, Object);
+        });
+        return UserSubjectModel.findOneAndUpdate({user: answer.user, subjectId}, update, options)
+    },
+
+    async createUserSubjectHistory(UserSubject) {
+        return new UserSubjectHistoryModel({
+            user: UserSubject.user,
+            subjectId: UserSubject.subjectId,
+            score: UserSubject.score
+        }).save();
+    },
+
+    async getPerformanceDistribution({params, userIds}) {
+        const {EntityHistoryModel} = userHelper.getEntityFromType(params.type);
+
+        if (!EntityHistoryModel || !params.id) throw new APP_ERROR({message: `Type or id is not valid`});
+        const pipeline = [
+            {
+                $match: {user: {"$in": userIds}, [`${params.type}Id`]: params.id}
+            },
+            {
+              $group : {
+                 _id : { month: { $month: "$createdAt" }, day: { $dayOfMonth: "$createdAt" }, year: { $year: "$createdAt" } },
+                 score: { $max: "$score" }
+              }
+            }
+         ]
+         // Score will change, as in case of class avg should be taken
+        return EntityHistoryModel.aggregate(pipeline).exec();
+    },
+
+    async getPerformanceScore({params, userIds}) {
+        const {EntityModel} = userHelper.getEntityFromType(params.type);
+        let groupBy;
+
+        if (!EntityModel  || !params.id) throw new APP_ERROR({message: `Type or id is not valid`});
+        if (params.queryType == "student") groupBy = `user`;
+        else if (params.queryType == "courseAttr") groupBy = `${params.type}Id`
+        else throw new APP_ERROR({message: `queryType is not valid`});
+
+        const pipeline = [
+            {
+                $match: {user: {"$in": userIds}, [`${params.type}Id`]: {$in: helperFunction.ensureArray(params.id)}}
+            },
+            {
+              $group : {
+                 _id : `$${groupBy}`,
+                 score: { $avg: "$score" }
+              }
+            }
+         ]
+         // Score will change, as in case of class avg should be taken
+        return EntityModel.aggregate(pipeline).exec();
     }
 }

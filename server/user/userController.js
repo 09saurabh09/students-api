@@ -64,5 +64,9 @@ module.exports = {
         userIds = userIds.map(userId => MONGOOSE.Types.ObjectId(userId));
         response.data = await userService.getPerformanceScore({params: query, userIds});
         RESPONSE_HELPER({ctx, response});
+    },
+
+    async getMyAssignments(ctx) {
+        
     }
 }

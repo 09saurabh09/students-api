@@ -69,5 +69,19 @@ module.exports = {
 		const {body, statusCode} = await requestHelper(options);
 		if(statusCode !== 200) throw new Error(`Unbale to fetch concept list`);
 		return _.get(body, `data`);
-    }
+    },
+
+    async getAssignmentList(params) {
+        let url = `${QUSETION_SERVER}/internal/api/assignments`;
+        let options = {
+            url,
+            method: 'GET',
+            json: true,
+            qs: params,
+            useQuerystring: true
+        };
+		const {body, statusCode} = await requestHelper(options);
+		if(statusCode !== 200) throw new Error(`Unbale to fetch concept list`);
+		return _.get(body, `data`);
+    },
 }
